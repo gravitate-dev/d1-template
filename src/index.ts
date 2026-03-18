@@ -2,16 +2,12 @@ export default {
   async fetch(request) {
     const url = new URL(request.url);
 
-    // Only allow calls to /grok
     if (url.pathname === "/grok") {
       const prompt = url.searchParams.get("prompt") || "Hello from XToys";
       const apiKey = request.headers.get("X-Api-Key");
 
       if (!apiKey) {
-        return new Response(JSON.stringify({ error: "Missing API Key" }), {
-          status: 401,
-          headers: { "Content-Type": "application/json" }
-        });
+        return new Response("Missing API Key", { status: 401 });
       }
 
       try {
@@ -29,16 +25,26 @@ export default {
         });
 
         const data = await grokRes.json();
+        const reply = data.choices?.[0]?.message?.content || "Sorry, no reply from Grok";
 
-        return new Response(JSON.stringify(data), {
-          headers: { "Content-Type": "application/json" }
+        // Send reply back to XToys
+        await fetch("https://webhook.xtoys.app/jRYu0MCVD0cP", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "grokReply",
+            reply: reply,
+            prompt: prompt
+          })
         });
+
+        return new Response("Reply sent to XToys", { status: 200 });
       } catch (err) {
-        return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+        console.error(err);
+        return new Response("Error: " + err.message, { status: 500 });
       }
     }
 
-    // Default help message
-    return new Response("Use: /grok?prompt=Your message here", { status: 400 });
+    return new Response("Send to /grok?prompt=your text", { status: 400 });
   }
 }
